@@ -283,11 +283,11 @@ int main(int argc, char **argv)
 	 * Establish initial configuration
 	 */
 	_init_config();
+	_parse_commandline(argc, argv);
 	slurm_conf_init(NULL);
 	log_init(argv[0], log_opts, LOG_DAEMON, NULL);
 	sched_log_init(argv[0], sched_log_opts, LOG_DAEMON, NULL);
 	slurmctld_pid = getpid();
-	_parse_commandline(argc, argv);
 	init_locks();
 	slurm_conf_reinit(slurm_conf_filename);
 
@@ -322,14 +322,16 @@ int main(int argc, char **argv)
 		slurmctld_config.daemonize = 0;
 	}
 
-	/*
-	 * Need to create pidfile here in case we setuid() below
-	 * (init_pidfile() exits if it can't initialize pid file).
-	 * On Linux we also need to make this setuid job explicitly
-	 * able to write a core dump.
-	 */
-	_init_pidfile();
-	_become_slurm_user();
+	if (!test_config) {
+		/*
+		 * Need to create pidfile here in case we setuid() below
+		 * (init_pidfile() exits if it can't initialize pid file).
+		 * On Linux we also need to make this setuid job explicitly
+		 * able to write a core dump.
+		 */
+		_init_pidfile();
+		_become_slurm_user();
+	}
 
 	/*
 	 * Create StateSaveLocation directory if necessary.
@@ -593,8 +595,8 @@ int main(int argc, char **argv)
 			if (!test_config) {
 				(void) _shutdown_backup_controller();
 				trigger_primary_ctld_res_ctrl();
+				ctld_assoc_mgr_init(&callbacks);
 			}
-			ctld_assoc_mgr_init(&callbacks);
 			if (slurm_acct_storage_init(NULL) != SLURM_SUCCESS) {
 				if (test_config) {
 					error("failed to initialize accounting_storage plugin");
@@ -617,9 +619,6 @@ int main(int argc, char **argv)
 
 			if (test_config) {
 				char *result_str;
-// Test with garbage in slurm.conf and other config files
-// Add regression test
-
 				if ((error_code = read_slurm_conf(0, false))) {
 					error("read_slurm_conf reading %s: %s",
 					      slurmctld_conf.slurm_conf,
@@ -627,11 +626,18 @@ int main(int argc, char **argv)
 					test_config_rc = 1;
 				}
 				unlock_slurmctld(config_write_lock);
+				if (config_test_result() != SLURM_SUCCESS)
+					test_config_rc = 1;
 
 				if (test_config_rc == 0)
 					result_str = "Succeeded";
 				else
 					result_str = "FAILED";
+				log_opts.stderr_level  = LOG_LEVEL_INFO;
+				log_opts.logfile_level = LOG_LEVEL_QUIET;
+				log_opts.syslog_level  = LOG_LEVEL_QUIET;
+				log_alter(log_opts, SYSLOG_FACILITY_DAEMON,
+					  slurmctld_conf.slurmctld_logfile);
 				info("%s configuration test", result_str);
 				exit(test_config_rc);
 			}
@@ -2670,6 +2676,7 @@ static void _parse_commandline(int argc, char **argv)
 	if (test_config) {
 		daemonize = 0;
 		recover = 0;
+		config_test_start();
 	}
 }
 
@@ -2828,7 +2835,11 @@ void update_logging(void)
 			(LOG_LEVEL_INFO + debug_level),
 			(LOG_LEVEL_END - 1));
 	}
-	if (slurmctld_conf.slurmctld_debug != NO_VAL16) {
+	if (test_config) {
+		log_opts.stderr_level  = LOG_LEVEL_ERROR;
+		log_opts.logfile_level = LOG_LEVEL_QUIET;
+		log_opts.syslog_level  = LOG_LEVEL_QUIET;
+	} else if (slurmctld_conf.slurmctld_debug != NO_VAL16) {
 		log_opts.stderr_level  = slurmctld_conf.slurmctld_debug;
 		log_opts.logfile_level = slurmctld_conf.slurmctld_debug;
 		log_opts.syslog_level  = slurmctld_conf.slurmctld_debug;

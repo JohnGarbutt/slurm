@@ -1312,6 +1312,8 @@ int read_slurm_conf(int recover, bool reconfig)
 			(void) slurm_sched_g_reconfig();
 		}
 	}
+	 if (test_config)
+		return error_code;
 
 	/* NOTE: Run load_all_resv_state() before _restore_job_dependencies */
 	_restore_job_dependencies();
@@ -1360,8 +1362,10 @@ int read_slurm_conf(int recover, bool reconfig)
 		rc = bb_g_load_state(true);
 	error_code = MAX(error_code, rc);	/* not fatal */
 
-	/* Restore job accounting info if file missing or corrupted,
-	 * an extremely rare situation */
+	/*
+	 * Restore job accounting info if file missing or corrupted,
+	 * an extremely rare situation
+	 */
 	if (load_job_ret)
 		_acct_restore_active_jobs();
 
