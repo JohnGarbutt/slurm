@@ -3191,6 +3191,10 @@ extern int fini(void)
 	xfree(state_save_loc);
 	slurm_mutex_unlock(&bb_state.bb_mutex);
 
+	// stop killing all run_command calls
+	// so we can restore from ha failover
+	run_command_shutdown_reset();
+
 	return SLURM_SUCCESS;
 }
 

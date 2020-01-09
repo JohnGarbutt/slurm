@@ -42,6 +42,9 @@
 /* used to terminate any outstanding commands */
 extern void run_command_shutdown(void);
 
+/* used to stop terminating any all commands */
+extern void run_command_shutdown_reset(void);
+
 /* Return count of child processes */
 extern int run_command_count(void);
 

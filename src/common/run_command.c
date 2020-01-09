@@ -70,6 +70,12 @@ extern void run_command_shutdown(void)
 	shutdown = 1;
 }
 
+/* used to stop terminating any all commands */
+extern void run_command_shutdown_reset(void)
+{
+	shutdown = 0;
+}
+
 /* Return count of child processes */
 extern int run_command_count(void)
 {
